@@ -39,7 +39,12 @@ class AlienInvasion:
         # Start Alien Invasion in an active state.
         self.game_active = True
 
-        #cooldown
+        #set up end game screen
+        self.font = pygame.font.SysFont(None, 80)
+        self.end_message = ""
+        self.screen_rect = self.screen.get_rect()
+
+        #cooldown timer
         self.last_shot_time = 0
         self.ufo_last_shot_time = 0
 
@@ -139,9 +144,11 @@ class AlienInvasion:
                 self.bullets, self.aliens, True, True)
 
         if not self.aliens:
-            # Destroy existing bullets and create new fleet.
+            # Destroy existing bullets and print end game message.
             self.bullets.empty()
             self._create_fleet()
+            self.game_active = False
+            self.end_message = "YOU WIN"
 
     def _check_ufo_bullet_ship_collisions(self):
         collisions = pygame.sprite.spritecollideany(self.ship, self.ufo_bullets)
@@ -168,6 +175,7 @@ class AlienInvasion:
             sleep(0.5)
         else:
             self.game_active = False
+            self.end_message = "GAME OVER"
 
     def _update_aliens(self):
         """Update the positions of all aliens in the fleet."""
@@ -239,6 +247,12 @@ class AlienInvasion:
 
         for bullet in self.ufo_bullets.sprites():
             bullet.draw_ufo_bullet()
+
+        #end game screen
+        message = self.font.render(self.end_message, True, (0,0,0))
+        message_rect = message.get_rect()
+        message_rect.center = self.screen_rect.center
+        self.screen.blit(message, message_rect)
 
         pygame.display.flip()
 
