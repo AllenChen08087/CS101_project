@@ -1,32 +1,34 @@
 import pygame
+from pygame.sprite import Sprite
 
-
-class Ship:
+class Ship(Sprite):
     """A class to manage the ship."""
 
-    def __init__(self, ai_game):
+    def __init__(self, ai_game, image_files, controls, starting_x_position):
         """Initialize the ship and set its starting position."""
+        super().__init__()
         self.screen = ai_game.screen
         self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()
+        self.controls = controls #Player Keys
+        self.starting_x_position = starting_x_position #Where ship starts on the screen
+        self.ships_left = self.settings.ship_limit #Ship's life
+        self.last_shot_time = 0 #Ship's cooldown
 
         # Load the ship image and get its rect.
-        self.image = pygame.image.load('images/ship.bmp')
+        self.image = pygame.image.load(image_files)
         self.rect = self.image.get_rect()
 
-        # Start each new ship at the bottom center of the screen.
-        self.rect.midbottom = self.screen_rect.midbottom
-
-        # Store a float for the ship's exact horizontal position.
-        self.x = float(self.rect.x)
+        #We move ship to their own starting spot instead of the center
 
         # Movement flags; start with a ship that's not moving.
         self.moving_right = False
         self.moving_left = False
 
+        self.center_ship()
+
     def center_ship(self):
-        """Center the ship on the screen."""
-        self.rect.midbottom = self.screen_rect.midbottom
+        self.rect.midbottom = (self.starting_x_position, self.screen_rect.bottom)
         self.x = float(self.rect.x)
 
     def update(self):

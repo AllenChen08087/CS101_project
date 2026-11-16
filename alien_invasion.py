@@ -28,7 +28,24 @@ class AlienInvasion:
         # Create an instance to store game statistics.
         self.stats = GameStats(self)
 
-        self.ship = Ship(self)
+        #Player controls
+        red_controls = {
+            "left": pygame.K_a,
+            "right": pygame.K_d,
+            "fire": pygame.K_r
+        }
+        blue_controls = {
+            "left": pygame.K_LEFT,
+            "right": pygame.K_RIGHT,
+            "fire": pygame.K_SPACE
+        }
+        width = self.settings.screen_width
+        #Creating the 2 ships
+        self.ships = pygame.sprite.Group()
+        self.red_ship = Ship(self, "images/ship_red.bmp", red_controls, width // 3)
+        self.blue_ship = Ship(self, "images/ship_blue.bmp", blue_controls, 2 * width // 3)
+        self.ships.add(self.red_ship, self.blue_ship)
+
         self.bullets = pygame.sprite.Group()
         self.aliens = pygame.sprite.Group()
         self.ufo_bullets = pygame.sprite.Group()
@@ -41,11 +58,11 @@ class AlienInvasion:
 
         #set up end game screen
         self.font = pygame.font.SysFont(None, 80)
+        self.lives_font = pygame.font.SysFont(None, 36)
         self.end_message = ""
         self.screen_rect = self.screen.get_rect()
 
         #cooldown timer
-        self.last_shot_time = 0
         self.ufo_last_shot_time = 0
 
     def run_game(self):
@@ -54,12 +71,12 @@ class AlienInvasion:
             self._check_events()
             
             if self.game_active:
-                self.ship.update()
+                self.ships.update()
                 self._update_bullets()
                 self._update_aliens()
                 self._update_ufo_bullets()
                 self.ufo.update()
-                self.ufo_fire_bullet()
+                self._ufo_fire_bullet()
 
             self._update_screen()
             self.clock.tick(60)
@@ -76,33 +93,37 @@ class AlienInvasion:
 
     def _check_keydown_events(self, event):
         """Respond to keypresses."""
-        if event.key == pygame.K_RIGHT:
-            self.ship.moving_right = True
-        elif event.key == pygame.K_LEFT:
-            self.ship.moving_left = True
-        elif event.key == pygame.K_q:
+        if event.key == pygame.K_q:
             sys.exit()
-        elif event.key == pygame.K_SPACE:
-            self._fire_bullet()            
+        for ship in self.ships:
+            if event.key == ship.controls["right"]:
+                ship.moving_right = True
+            elif event.key == ship.controls["left"]:
+                ship.moving_left = True
+            elif event.key == ship.controls["fire"]:
+                self._fire_bullet(ship)
+
 
     def _check_keyup_events(self, event):
         """Respond to key releases."""
-        if event.key == pygame.K_RIGHT:
-            self.ship.moving_right = False
-        elif event.key == pygame.K_LEFT:
-            self.ship.moving_left = False
+        for ship in self.ships:
+            if event.key == ship.controls["right"]:
+                ship.moving_right = False
+            elif event.key == ship.controls["left"]:
+                ship.moving_left = False
 
-    def _fire_bullet(self):
+
+    def _fire_bullet(self, ship):
         """Create a new bullet and add it to the bullets group."""
         #if len(self.bullets) < self.settings.bullets_allowed:
         #new_bullet = Bullet(self)
         #self.bullets.add(new_bullet)
         current_time = pygame.time.get_ticks()
 
-        if current_time - self.last_shot_time >= self.settings.bullets_cooldown:
-            new_bullet = Bullet(self)
+        if current_time - ship.last_shot_time >= self.settings.bullets_cooldown:
+            new_bullet = Bullet(self, ship)
             self.bullets.add(new_bullet)
-            self.last_shot_time = current_time
+            ship.last_shot_time = current_time
 
     def _update_bullets(self):
         """Update position of bullets and get rid of old bullets."""
@@ -116,7 +137,7 @@ class AlienInvasion:
 
         self._check_bullet_alien_collisions()
 
-    def ufo_fire_bullet(self):
+    def _ufo_fire_bullet(self):
         """Create a new bullet and add it to the bullets group."""
         #if len(self.bullets) < self.settings.bullets_allowed:
         #new_bullet = Bullet(self)
@@ -151,28 +172,36 @@ class AlienInvasion:
             self.end_message = "YOU WIN"
 
     def _check_ufo_bullet_ship_collisions(self):
-        collisions = pygame.sprite.spritecollideany(self.ship, self.ufo_bullets)
+        collisions = pygame.sprite.groupcollide(self.ships, self.ufo_bullets, False, True)
         if collisions:
-            self._ship_hit()
-            self.ufo_bullets.empty()
+            self._ship_hit(list(collisions.keys()))
 
 
-    def _ship_hit(self):
+    def _reset_round(self):
+        # Get rid of any remaining bullets and aliens.
+        self.bullets.empty()
+        self.aliens.empty()
+        self.ufo_bullets.empty()
+
+        # Create a new fleet and center the ship.
+        self._create_fleet()
+        for ship in self.ships:
+            ship.center_ship()
+
+        # Pause.
+        sleep(0.5)
+
+    def _ship_hit(self, hit_ships):
         """Respond to the ship being hit by an alien."""
-        if self.stats.ships_left > 0:
-            # Decrement ships_left.
-            self.stats.ships_left -= 1
+        for ship in hit_ships:
+            if ship.ships_left > 0:
+                # Decrement ships_left.
+                ship.ships_left -= 1
+            else:
+                ship.kill()
 
-            # Get rid of any remaining bullets and aliens.
-            self.bullets.empty()
-            self.aliens.empty()
-
-            # Create a new fleet and center the ship.
-            self._create_fleet()
-            self.ship.center_ship()
-
-            # Pause.
-            sleep(0.5)
+        if self.ships:
+            self._reset_round()
         else:
             self.game_active = False
             self.end_message = "GAME OVER"
@@ -184,8 +213,11 @@ class AlienInvasion:
         self.aliens.update()
 
         # Look for alien-ship collisions.
-        if pygame.sprite.spritecollideany(self.ship, self.aliens):
-            self._ship_hit()
+        hit_ships = [ship for ship in self.ships
+                     if pygame.sprite.spritecollideany(ship, self.aliens)]
+        if hit_ships:
+            self._ship_hit(hit_ships)
+            return
 
         # Look for aliens hitting the bottom of the screen.
         self._check_aliens_bottom()
@@ -195,7 +227,7 @@ class AlienInvasion:
         for alien in self.aliens.sprites():
             if alien.rect.bottom >= self.settings.screen_height:
                 # Treat this the same as if the ship got hit.
-                self._ship_hit()
+                self._ship_hit(self.ships.sprites())
                 break
 
     def _create_fleet(self):
@@ -236,12 +268,36 @@ class AlienInvasion:
             alien.rect.y += self.settings.fleet_drop_speed
         self.settings.fleet_direction *= -1
 
+    def _draw_lives(self):
+        """Show each player's ships left in the top corners."""
+        #Red player, top left.
+        if self.red_ship.alive():
+            red_text = f"Red: {self.red_ship.ships_left}"
+        else:
+            red_text = "Red: OUT"
+        red_image = self.lives_font.render(red_text, True, (200, 30, 30))
+        red_rect = red_image.get_rect()
+        red_rect.topleft = (20, 20)
+        self.screen.blit(red_image, red_rect)
+
+        #Blue player, top right.
+        if self.blue_ship.alive():
+            blue_text = f"Blue: {self.blue_ship.ships_left}"
+        else:
+            blue_text = "Blue: OUT"
+        blue_image = self.lives_font.render(blue_text, True, (30, 70, 220))
+        blue_rect = blue_image.get_rect()
+        blue_rect.topright = (self.screen_rect.right - 20, 20)
+        self.screen.blit(blue_image, blue_rect)
+
     def _update_screen(self):
         """Update images on the screen, and flip to the new screen."""
         self.screen.fill(self.settings.bg_color)
         for bullet in self.bullets.sprites():
             bullet.draw_bullet()
-        self.ship.blitme()
+        for ship in self.ships:
+            ship.blitme()
+        self._draw_lives()
         self.ufo.blitme()
         self.aliens.draw(self.screen)
 
