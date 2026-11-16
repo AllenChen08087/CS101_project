@@ -6,6 +6,9 @@ class Ufo:
 
     def __init__(self, ai_game):
         """Initialize the ufo and set its starting position."""
+
+        #test1 if the ufo appears at the middle top of the screen at the start of the game
+        #expected result: a ufo at the middle top of the screen at the start of the game
         self.screen = ai_game.screen
         self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()
@@ -42,6 +45,9 @@ class Ufo:
         self.rect.x = self.x
 
         #changing direction of the ufo once hitting the boundary
+        #test2: test if the ufo is moving left and right at constant speed indicated in the setting before making it firing bullets
+        #expected result: the ufo starts in the middle top of the screen at the beginning of the game, first moves to the right at a constant speed
+        #                 until hitting the boundary, then moves to the left until hitting the boundary, and so on.
         if self.rect.right >= self.screen_rect.right:
             self.direction *= -1
         if self.rect.left <= self.screen_rect.left:

@@ -115,9 +115,8 @@ class AlienInvasion:
 
     def _fire_bullet(self, ship):
         """Create a new bullet and add it to the bullets group."""
-        #if len(self.bullets) < self.settings.bullets_allowed:
-        #new_bullet = Bullet(self)
-        #self.bullets.add(new_bullet)
+
+        #add the cooldown instead of having limit on the number of bullets
         current_time = pygame.time.get_ticks()
 
         if current_time - ship.last_shot_time >= self.settings.bullets_cooldown:
@@ -138,10 +137,8 @@ class AlienInvasion:
         self._check_bullet_alien_collisions()
 
     def _ufo_fire_bullet(self):
-        """Create a new bullet and add it to the bullets group."""
-        #if len(self.bullets) < self.settings.bullets_allowed:
-        #new_bullet = Bullet(self)
-        #self.bullets.add(new_bullet)
+        """Create a new ufo bullet and add it to the bullets group."""
+
         current_time = pygame.time.get_ticks()
 
         if current_time - self.ufo_last_shot_time >= self.settings.ufo_bullets_cooldown:
@@ -151,6 +148,15 @@ class AlienInvasion:
 
     def _update_ufo_bullets(self):
         self.ufo_bullets.update()
+        """Update the positions of the ufo bullets and get rid the of ones that reach the bottom"""
+
+        #test 3: test if the ufo fires a bullet every while based on the cooldown indicated in the setting
+        #expected result: the ufo fires a red and wide bullet (as indicated in the ufo_bullet file) that goes down the screen
+        #                 and disappears once hitting the bottom of the screen\
+
+        #test 4: test if the ufo bullet disappears once hitting the ship, then reset the game
+        #expected result: the ufo bullet disappears when hitting the ship, the game should restart
+        #                 the alien fleet, ship, and ufo should return to their original positions, and the number of ships left should decrease
 
         for bullet in self.ufo_bullets.copy():
             if bullet.rect.bottom >= self.settings.screen_height:
@@ -172,6 +178,7 @@ class AlienInvasion:
             self.end_message = "YOU WIN"
 
     def _check_ufo_bullet_ship_collisions(self):
+        """Respond to collisions between the ufo bullet and the ships"""
         collisions = pygame.sprite.groupcollide(self.ships, self.ufo_bullets, False, True)
         if collisions:
             self._ship_hit(list(collisions.keys()))
@@ -305,6 +312,9 @@ class AlienInvasion:
             bullet.draw_ufo_bullet()
 
         #end game screen
+        #test 5: test if the end game message appears on the screen when the game ends
+        #expected result: if the player kills all the aliens, the screen should display YOU WIN
+        #                 if the player loses all the lives, the screen should display GAME OVER
         message = self.font.render(self.end_message, True, (0,0,0))
         message_rect = message.get_rect()
         message_rect.center = self.screen_rect.center
