@@ -15,7 +15,9 @@ class Bullet(Sprite):
         self.rect = pygame.Rect(0, 0, self.settings.bullet_width,
             self.settings.bullet_height)
 
+        #remember which ship fired it (not used yet, but could be for things like a score for each player)
         self.ship = ship
+        #start at the nose of the ship that fired, not always the same ship
         self.rect.midtop = ship.rect.midtop
 
         # Store the bullet's position as a float.

@@ -29,6 +29,8 @@ class AlienInvasion:
         self.stats = GameStats(self)
 
         #Player controls
+        #each player's keys go in a dictionary, so one Ship class works for both players
+        #pygame.K_... are pygame's codes for each key
         red_controls = {
             "left": pygame.K_a,
             "right": pygame.K_d,
@@ -41,6 +43,11 @@ class AlienInvasion:
         }
         width = self.settings.screen_width
         #Creating the 2 ships
+        #same Ship class, just a different image, keys, and starting spot (1/3 and 2/3 across the screen)
+        #the group lets us update, draw, and check collisions for both ships with one call
+        #self.red_ship and self.blue_ship are kept too so _draw_lives can still find a ship after it's removed
+        #test 6: test if both ships appear at the start of the game
+        #expected result: a red ship at the bottom 1/3 of the way across the screen and a blue ship 2/3 of the way across
         self.ships = pygame.sprite.Group()
         self.red_ship = Ship(self, "images/ship_red.bmp", red_controls, width // 3)
         self.blue_ship = Ship(self, "images/ship_blue.bmp", blue_controls, 2 * width // 3)
@@ -71,7 +78,7 @@ class AlienInvasion:
             self._check_events()
             
             if self.game_active:
-                self.ships.update()
+                self.ships.update() #the group calls update() on each ship
                 self._update_bullets()
                 self._update_aliens()
                 self._update_ufo_bullets()
@@ -95,17 +102,22 @@ class AlienInvasion:
         """Respond to keypresses."""
         if event.key == pygame.K_q:
             sys.exit()
+        #instead of hard coding the arrow keys, check the key against each ship's own controls
+        #a ship that's out of lives isn't in self.ships anymore, so its keys stop doing anything
+        #test 7: test if each player only controls their own ship
+        #expected result: A/D only move the red ship and the left/right arrows only move the blue ship
         for ship in self.ships:
             if event.key == ship.controls["right"]:
                 ship.moving_right = True
             elif event.key == ship.controls["left"]:
                 ship.moving_left = True
             elif event.key == ship.controls["fire"]:
-                self._fire_bullet(ship)
+                self._fire_bullet(ship) #pass in the ship so we know who fired
 
 
     def _check_keyup_events(self, event):
         """Respond to key releases."""
+        #same loop as keydown, letting go of a key stops that ship
         for ship in self.ships:
             if event.key == ship.controls["right"]:
                 ship.moving_right = False
@@ -114,9 +126,14 @@ class AlienInvasion:
 
 
     def _fire_bullet(self, ship):
-        """Create a new bullet and add it to the bullets group."""
+        """Fire a bullet from the given ship if its cooldown is over."""
 
         #add the cooldown instead of having limit on the number of bullets
+        #get_ticks() is the milliseconds since the game started
+        #each ship has its own last_shot_time, so one player shooting doesn't block the other
+        #test 8: test if each ship fires its own bullets with its own cooldown
+        #expected result: R fires from the red ship and space fires from the blue ship,
+        #                 both players can fire at the same time, and holding a fire key only shoots once per cooldown
         current_time = pygame.time.get_ticks()
 
         if current_time - ship.last_shot_time >= self.settings.bullets_cooldown:
@@ -179,12 +196,19 @@ class AlienInvasion:
 
     def _check_ufo_bullet_ship_collisions(self):
         """Respond to collisions between the ufo bullet and the ships"""
+        #groupcollide checks every ship against every ufo bullet
+        #False = keep the ships (we handle lives ourselves), True = delete the bullet that hit
+        #it returns a dictionary {ship: [bullets that hit it]}, so the keys are the ships that got hit
+        #test 9: test if only the ship that gets shot loses a life
+        #expected result: when a ufo bullet hits one ship, only that ship's counter goes down, the other one stays the same
         collisions = pygame.sprite.groupcollide(self.ships, self.ufo_bullets, False, True)
         if collisions:
             self._ship_hit(list(collisions.keys()))
 
 
     def _reset_round(self):
+        """Clear the bullets and aliens, make a new fleet, and move the ships back."""
+        #used after any ship loses a life, so the round restarts the same way every time
         # Get rid of any remaining bullets and aliens.
         self.bullets.empty()
         self.aliens.empty()
@@ -199,14 +223,19 @@ class AlienInvasion:
         sleep(0.5)
 
     def _ship_hit(self, hit_ships):
-        """Respond to the ship being hit by an alien."""
+        """Respond to one or more ships being hit by an alien or a ufo bullet."""
+        #takes a list since more than one ship can get hit at once (like aliens reaching the bottom)
+        #test 10: test if a player who runs out of lives is removed and the other player keeps playing
+        #expected result: the ship that runs out disappears and its counter shows OUT, the other ship keeps playing,
+        #                 and GAME OVER only shows once both ships are out
         for ship in hit_ships:
             if ship.ships_left > 0:
                 # Decrement ships_left.
                 ship.ships_left -= 1
             else:
-                ship.kill()
+                ship.kill() #kill() comes from Sprite, removes the ship from self.ships
 
+        #an empty group counts as False, so this means at least one player is still alive
         if self.ships:
             self._reset_round()
         else:
@@ -220,11 +249,15 @@ class AlienInvasion:
         self.aliens.update()
 
         # Look for alien-ship collisions.
+        #list comprehension: make a list of every ship that an alien is touching
+        #spritecollideany returns the alien touching the ship, or None if there isn't one
+        #test 11: test if an alien touching one ship only takes a life from that ship
+        #expected result: the ship that touched the alien loses one life and the round resets
         hit_ships = [ship for ship in self.ships
                      if pygame.sprite.spritecollideany(ship, self.aliens)]
         if hit_ships:
             self._ship_hit(hit_ships)
-            return
+            return #the round was just reset, so skip the bottom check this frame
 
         # Look for aliens hitting the bottom of the screen.
         self._check_aliens_bottom()
@@ -234,6 +267,9 @@ class AlienInvasion:
         for alien in self.aliens.sprites():
             if alien.rect.bottom >= self.settings.screen_height:
                 # Treat this the same as if the ship got hit.
+                #nobody stopped the aliens, so every ship still playing loses a life
+                #test 12: test if aliens reaching the bottom take a life from both players
+                #expected result: both counters go down by one and the round resets
                 self._ship_hit(self.ships.sprites())
                 break
 
@@ -277,6 +313,11 @@ class AlienInvasion:
 
     def _draw_lives(self):
         """Show each player's ships left in the top corners."""
+        #render() turns the text into an image, then we place it with get_rect() and draw it with blit()
+        #alive() comes from Sprite, it's False once the ship was removed with kill()
+        #test 13: test if each player's lives show up and update
+        #expected result: "Red: 3" in the top left and "Blue: 3" in the top right, the number goes down when that ship gets hit,
+        #                 and it shows OUT once the ship is removed
         #Red player, top left.
         if self.red_ship.alive():
             red_text = f"Red: {self.red_ship.ships_left}"
@@ -302,7 +343,7 @@ class AlienInvasion:
         self.screen.fill(self.settings.bg_color)
         for bullet in self.bullets.sprites():
             bullet.draw_bullet()
-        for ship in self.ships:
+        for ship in self.ships: #only ships still playing get drawn
             ship.blitme()
         self._draw_lives()
         self.ufo.blitme()
