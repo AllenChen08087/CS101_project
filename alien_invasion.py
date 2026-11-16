@@ -8,6 +8,8 @@ from game_stats import GameStats
 from ship import Ship
 from bullet import Bullet
 from alien import Alien
+from ufo import Ufo
+from ufo_bullet import UfoBullet
 
 
 class AlienInvasion:
@@ -29,6 +31,8 @@ class AlienInvasion:
         self.ship = Ship(self)
         self.bullets = pygame.sprite.Group()
         self.aliens = pygame.sprite.Group()
+        self.ufo_bullets = pygame.sprite.Group()
+        self.ufo = Ufo(self)
 
         self._create_fleet()
 
@@ -36,8 +40,8 @@ class AlienInvasion:
         self.game_active = True
 
         #cooldown
-        self.shoot_cooldown = self.settings.bullets_cooldown
         self.last_shot_time = 0
+        self.ufo_last_shot_time = 0
 
     def run_game(self):
         """Start the main loop for the game."""
@@ -48,6 +52,9 @@ class AlienInvasion:
                 self.ship.update()
                 self._update_bullets()
                 self._update_aliens()
+                self._update_ufo_bullets()
+                self.ufo.update()
+                self.ufo_fire_bullet()
 
             self._update_screen()
             self.clock.tick(60)
@@ -87,7 +94,7 @@ class AlienInvasion:
         #self.bullets.add(new_bullet)
         current_time = pygame.time.get_ticks()
 
-        if current_time - self.last_shot_time >= self.shoot_cooldown:
+        if current_time - self.last_shot_time >= self.settings.bullets_cooldown:
             new_bullet = Bullet(self)
             self.bullets.add(new_bullet)
             self.last_shot_time = current_time
@@ -103,7 +110,27 @@ class AlienInvasion:
                 self.bullets.remove(bullet)
 
         self._check_bullet_alien_collisions()
-        
+
+    def ufo_fire_bullet(self):
+        """Create a new bullet and add it to the bullets group."""
+        #if len(self.bullets) < self.settings.bullets_allowed:
+        #new_bullet = Bullet(self)
+        #self.bullets.add(new_bullet)
+        current_time = pygame.time.get_ticks()
+
+        if current_time - self.ufo_last_shot_time >= self.settings.ufo_bullets_cooldown:
+            new_bullet = UfoBullet(self)
+            self.ufo_bullets.add(new_bullet)
+            self.ufo_last_shot_time = current_time
+
+    def _update_ufo_bullets(self):
+        self.ufo_bullets.update()
+
+        for bullet in self.ufo_bullets.copy():
+            if bullet.rect.bottom >= self.settings.screen_height:
+                self.ufo_bullets.remove(bullet)
+
+        self._check_ufo_bullet_ship_collisions()
 
     def _check_bullet_alien_collisions(self):
         """Respond to bullet-alien collisions."""
@@ -115,6 +142,13 @@ class AlienInvasion:
             # Destroy existing bullets and create new fleet.
             self.bullets.empty()
             self._create_fleet()
+
+    def _check_ufo_bullet_ship_collisions(self):
+        collisions = pygame.sprite.spritecollideany(self.ship, self.ufo_bullets)
+        if collisions:
+            self._ship_hit()
+            self.ufo_bullets.empty()
+
 
     def _ship_hit(self):
         """Respond to the ship being hit by an alien."""
@@ -163,7 +197,7 @@ class AlienInvasion:
         alien = Alien(self)
         alien_width, alien_height = alien.rect.size
 
-        current_x, current_y = alien_width, alien_height
+        current_x, current_y = alien_width, (alien_height + 25)
         while current_y < (self.settings.screen_height - 3 * alien_height):
             while current_x < (self.settings.screen_width - 2 * alien_width):
                 self._create_alien(current_x, current_y)
@@ -200,7 +234,11 @@ class AlienInvasion:
         for bullet in self.bullets.sprites():
             bullet.draw_bullet()
         self.ship.blitme()
+        self.ufo.blitme()
         self.aliens.draw(self.screen)
+
+        for bullet in self.ufo_bullets.sprites():
+            bullet.draw_ufo_bullet()
 
         pygame.display.flip()
 
