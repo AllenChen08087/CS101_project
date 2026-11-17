@@ -64,8 +64,8 @@ class AlienInvasion:
         self.game_active = True
 
         #set up end game screen
-        self.font = pygame.font.SysFont(None, 80)
-        self.lives_font = pygame.font.SysFont(None, 36)
+        self.font = pygame.font.Font(None, 80)
+        self.lives_font = pygame.font.Font(None, 36)
         self.end_message = ""
         self.screen_rect = self.screen.get_rect()
 
